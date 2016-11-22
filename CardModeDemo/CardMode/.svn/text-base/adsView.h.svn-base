@@ -1,0 +1,18 @@
+//
+//  adsView.h
+//  demo
+//
+//  Created by apple on 16/6/6.
+//
+//
+
+#import <UIKit/UIKit.h>
+
+@interface adsView : UIView
+
+//布局视图
+-(void)set_upWithAdsInfo:(NSDictionary*)dictionary;
+
+//重新加载数据
+-(void)reloadDataWithMessage:(NSDictionary*)dictionary;
+@end

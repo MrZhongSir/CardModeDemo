@@ -1,0 +1,233 @@
+//
+//  MessageDetailCtl.m
+//  Huilc
+//
+//  Created by apple on 15/5/25.
+//  Copyright (c) 2015年 RongXin. All rights reserved.
+//
+
+#import "MessageDetailCtl.h"
+#import "requestAPIClass.h"
+#import "ExampleClass.h"
+#import "UploadErrorView.h"
+
+@interface MessageDetailCtl ()<requestAPIDelegate,UIWebViewDelegate,UploadErrorDelegate>
+{
+    NSMutableDictionary *_data;//存储数据
+    BOOL _isUploadSuccess;//加载是否成功（有时加载一个页面同时会返回成功和失败两种状态）
+}
+@end
+
+@implementation MessageDetailCtl
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view from its nib.
+    _isUploadSuccess = NO;
+    _data = [[NSMutableDictionary alloc]init];
+    //获取网络数据
+    [self getMessageDetail];
+}
+
+-(void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+}
+
+-(void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:YES];
+    
+    [ExampleClass sendStartView:[NSString stringWithFormat:@"%@",[self class]]];
+}
+
+-(void)viewDidDisappear:(BOOL)animated
+{
+    [super viewDidDisappear:YES];
+    [ExampleClass sendEndView:[NSString stringWithFormat:@"%@",[self class]]];
+}
+
+#pragma mark- 获取消息详情信息
+-(void)getMessageDetail
+{
+    requestAPIClass *request = [[requestAPIClass alloc]init];
+    request.delegate = self;
+    
+    //根据消息的id获取消息详情信息
+    [request getMessageDetailWithNoticeId:self.noticeId];
+    
+    [[UploadAnimationView shareInstanceView] setAnimationType:CustomAnimation ViewType:AnimationViewCoverSecondMainView AndUserInteraction:NO AndIsShowInWindow:NO];
+}
+
+#pragma mark- requestAPIDelegate 的代理方法
+-(void)getAPIResultSuccess:(NSDictionary *)result AndApiTag:(int)tag
+{
+    //消息中心信息列表
+    if (tag == Get_API_Tag_76)
+    {
+        if([[result objectForKey:@"responseCode"] isEqualToString:@"0000"])
+        {
+            //转换JSON格式
+            NSDictionary *dic = [NSJSONSerialization JSONObjectWithData:[[result objectForKey:@"message"] dataUsingEncoding:NSUTF8StringEncoding] options:NSJSONReadingMutableContainers error:nil];
+            
+            [_data setDictionary:dic];
+            
+            if ([dic objectForKey:@"contentUrl"] !=nil&&![[dic objectForKey:@"contentUrl"]isEqualToString:@""]) {//显示webview
+                self.backView.hidden = YES;
+                self.myWebView.hidden = YES;
+                [self.myWebView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:[dic objectForKey:@"contentUrl"]]]];
+            }
+            else
+            {
+                //移除加载图
+                if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+                    [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+                }
+                
+                self.myWebView.hidden = YES;
+                self.backView.hidden = NO;
+                self.messageTitleLab.text = [dic objectForKey:@"title"];
+                self.messageTimeLab.text = [dic objectForKey:@"sendTime"];
+                [self.messageContentWeb loadHTMLString:[dic objectForKey:@"content"] baseURL:nil];
+                
+                [UIView animateWithDuration:0.3 animations:^{
+                    self.backView.alpha = 1.0;
+                }];
+            }
+        }
+        else
+        {
+            //移除加载图
+            if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+                [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+            }
+            
+            [ExampleClass yuanfang:[result objectForKey:@"message"]];
+            
+            [self showInternetErrorViewWithErrorType:NetworkUploadDataFail];
+        }
+    }
+}
+
+//网络请求失败调用的代理方法
+-(void)getAPIResultFailed:(NSError *)error AndApiTag:(int)tag
+{
+    if (tag == Get_API_Tag_76){
+
+        //移除加载图
+        if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+            [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+        }
+        
+        [self showInternetErrorViewWithErrorType:NetworkOverTime];
+    }
+}
+
+//请求失败时显示的视图(NetworkErrorType表示失败类型)
+-(void)showInternetErrorViewWithErrorType:(NetworkErrorType)type
+{
+    CGRect rect = CGRectMake(0, (APPScreenBoundsHeight - 150)/2.0, APPScreenBoundsWidth, 150);
+    UploadErrorView *errorView = [[UploadErrorView alloc]initWithFrame:rect AndTarget:self AndViewTag:10000 AndErrorType:type];
+    [self.view addSubview:errorView];
+}
+
+-(void)gestureActionWithViewTag:(NSInteger)tag
+{
+    if (tag == 10000) {
+        //获取网络数据
+        [self getMessageDetail];
+    }
+}
+
+-(void)webViewDidStartLoad:(UIWebView *)webView
+{
+    if (_isUploadSuccess == NO) {
+        [[UploadAnimationView shareInstanceView] setAnimationType:CustomAnimation ViewType:AnimationViewCoverSecondMainView AndUserInteraction:NO AndIsShowInWindow:NO];
+    }
+}
+
+-(void)webViewDidFinishLoad:(UIWebView *)webView
+{
+    //移除网络提示视图
+    UIView *view = [self.view viewWithTag:10000];
+    if (view != nil) {
+        [view removeFromSuperview];
+    }
+    
+    _isUploadSuccess = YES;
+    
+    //移除加载图
+    if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+        [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+    }
+    
+    if(_myWebView.hidden){
+        //显示视图
+        _myWebView.hidden = NO;
+        [UIView animateWithDuration:0.3 animations:^{
+            _myWebView.alpha = 1.0;
+        }];
+    }
+}
+
+-(void)webView:(UIWebView *)webView didFailLoadWithError:(NSError *)error
+{
+    //当链接请求失败时并且内容不为空时显示内容
+    if (webView == self.myWebView) {
+        
+        if ([_data objectForKey:@"content"] !=nil &&![[_data objectForKey:@"content"] isEqualToString:@""])
+        {
+            //移除加载图
+            if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+                [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+            }
+            
+            self.myWebView.hidden = YES;
+            self.backView.hidden = NO;
+            self.messageTitleLab.text = [_data objectForKey:@"title"];
+            self.messageTimeLab.text = [_data objectForKey:@"sendTime"];
+            [self.messageContentWeb loadHTMLString:[_data objectForKey:@"content"] baseURL:nil];
+            
+            [UIView animateWithDuration:0.3 animations:^{
+                self.backView.alpha = 1.0;
+            }];
+        }else{
+            
+            if (_isUploadSuccess == NO) {
+                
+                //移除加载图
+                if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+                    [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+                }
+                
+                [self showInternetErrorViewWithErrorType:NetworkOverTime];
+            }else{
+                //提示网络错误
+                [[UploadAnimationView shareInstanceView] setAnimationType:NetworkErrorAnimation ViewType:AnimationViewCoverAllView AndUserInteraction:NO AndIsShowInWindow:NO];
+            }
+        }
+    }
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+/*
+#pragma mark - Navigation
+
+// In a storyboard-based application, you will often want to do a little preparation before navigation
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+    // Get the new view controller using [segue destinationViewController].
+    // Pass the selected object to the new view controller.
+}
+*/
+
+#pragma mark- 返回按钮响应事件
+- (IBAction)BackAction:(UIButton *)sender {
+    
+    [self.navigationController popViewControllerAnimated:YES];
+}
+
+@end

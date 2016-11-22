@@ -1,0 +1,236 @@
+//
+//  MessageCenterCtl.m
+//  Huilc
+//
+//  Created by apple on 15/5/25.
+//  Copyright (c) 2015年 RongXin. All rights reserved.
+//
+
+#import "MessageCenterCtl.h"
+#import "MessageDetailCtl.h"
+#import "UserMessage.h"
+#import "requestAPIClass.h"
+#import <QuartzCore/QuartzCore.h>
+#import "adsView.h"
+#import "UploadErrorView.h"
+
+
+#define adsViewWidth 293.0*(APPScreenBoundsWidth/320.0)
+#define RatioValue  (APPScreenBoundsHeight-118)/450.0
+
+@interface MessageCenterCtl ()<requestAPIDelegate,SlideImageViewDelegate,UploadErrorDelegate>
+{
+    //声明私有成员变量
+    NSMutableArray *_arrData;
+    requestAPIClass *_requestAPIClass;
+    SlideImageView *slideImageView;
+    
+    NSInteger _curPage;//当前页
+    NSInteger _totalPage;//总页
+    BOOL _isRequesting;//是否正在请求数据
+}
+@end
+
+@implementation MessageCenterCtl
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self) {
+        CGRect rect = {{lrintf((APPScreenBoundsWidth-adsViewWidth)/2.0),118},{lrintf(adsViewWidth) , APPScreenBoundsHeight-118}};
+        slideImageView = [[SlideImageView alloc]initWithFrame:rect ZMarginValue:9/(RatioValue) XMarginValue:11/(RatioValue) AngleValue:1 Alpha:2000];
+        slideImageView.layer.cornerRadius = 10;
+        slideImageView.backgroundColor = [UIColor clearColor];
+        slideImageView.delegate = self;
+    }
+    return self;
+}
+
+-(void)SlideImageViewDidClickWithIndex:(NSInteger)index
+{
+    //当点击了详情时跳转下一页（index为暂定为消息id）
+    MessageDetailCtl *ctl = [[MessageDetailCtl alloc]init];
+    ctl.noticeId = [NSString stringWithFormat:@"%ld",(long)index];
+    [self.navigationController pushViewController:ctl animated:YES];
+}
+
+-(void)SlideImageViewDidEndScorllWithIndex:(NSInteger)index
+{
+    //检测是否需要再次请求数据加载（当滑倒甚于的消息数小于3时请求下一页，还应该设置一个标签只发起一次请求，请求成功后才允许发起下次请求）
+    if(index<3&&_curPage<_totalPage&&_isRequesting == NO){
+        _isRequesting = YES;
+        NSInteger page =  _curPage + 1;
+        [self getDataWithCurPage:[NSString stringWithFormat:@"%ld",(long)page]];
+    }
+}
+
+-(void)SlideImageViewDidScrollWithPage:(NSInteger)page AndIndex:(NSInteger)index
+{    
+    //判断是否为第一页
+    if(page == index){
+        if (self.comeBackFristMessageButton.frame.origin.y<APPScreenBoundsHeight) {
+            [UIView animateWithDuration:0.8 animations:^{
+                self.comeBackFristMessageButton.center = CGPointMake(self.comeBackFristMessageButton.center.x, self.comeBackFristMessageButton.center.y+self.comeBackFristMessageButton.frame.size.height);
+            }];
+        }
+    }else{
+        if (self.comeBackFristMessageButton.frame.origin.y>=APPScreenBoundsHeight) {
+            [UIView animateWithDuration:0.8 animations:^{
+                self.comeBackFristMessageButton.center = CGPointMake(self.comeBackFristMessageButton.center.x, self.comeBackFristMessageButton.center.y-self.comeBackFristMessageButton.frame.size.height);
+            }];
+        }
+    }
+    
+    //提醒已是最后一条消息,由透明慢慢显现
+    if (_curPage == _totalPage && slideImageView.scrollView.contentOffset.y<0) {
+        self.lastMessageNotice.alpha = -(slideImageView.scrollView.contentOffset.y/50.0);
+    }
+}
+- (IBAction)comeBackFristMessageAction:(UIButton *)sender {
+    [slideImageView.scrollView setContentOffset:CGPointMake(0, slideImageView.scrollView.contentSize.height-slideImageView.scrollView.frame.size.height) animated:YES];
+}
+
+-(void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:YES];
+    [self.navigationController setNavigationBarHidden:YES animated:NO];
+}
+
+-(void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:YES];
+    [ExampleClass sendStartView:[NSString stringWithFormat:@"%@",[self class]]];
+}
+
+-(void)viewDidDisappear:(BOOL)animated
+{
+    [super viewDidDisappear:YES];
+    [ExampleClass sendEndView:[NSString stringWithFormat:@"%@",[self class]]];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view from its nib.
+    
+    //初始化
+    _curPage = 1;
+    _totalPage = 1;
+    _isRequesting = NO;
+    
+    [self.view insertSubview:slideImageView atIndex:3];
+    [slideImageView setImageShadowsWtihDirectionX:4 Y:4 Alpha:0.8];
+
+    //实例化网络请求对象
+    _requestAPIClass = [[requestAPIClass alloc]init];
+    _requestAPIClass.delegate = self;
+    
+    //实例化数组
+    _arrData = [[NSMutableArray alloc]init];
+    
+    //获取网络数据
+    [self getDataWithCurPage:@"1"];
+}
+
+#pragma mark- 数据
+-(void)getDataWithCurPage:(NSString*)curPage
+{
+    [_requestAPIClass getMessageCenterMessageWithCurPage:curPage];
+    
+    //第一次请求时显示动态加载图
+    if (_arrData.count == 0) {
+        [[UploadAnimationView shareInstanceView] setAnimationType:CustomAnimation ViewType:AnimationViewCoverSecondMainView AndUserInteraction:NO AndIsShowInWindow:NO];
+    }
+}
+
+#pragma mark- requestAPIDelegate 的代理方法
+-(void)getAPIResultSuccess:(NSDictionary *)result AndApiTag:(int)tag
+{
+    //移除加载图
+    if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+        [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+    }
+    
+    //消息中心信息列表
+    if (tag == Get_API_Tag_75)
+    {
+        //请求成功后释放_isRequesting
+        _isRequesting = NO;
+        
+        if([[result objectForKey:@"responseCode"] isEqualToString:@"0000"])
+        {
+            _curPage = [[result objectForKey:@"curPage"]integerValue];
+            _totalPage = [[result objectForKey:@"totalPage"]integerValue];
+            
+            NSArray *array = [NSJSONSerialization JSONObjectWithData:[[result objectForKey:@"message"] dataUsingEncoding:NSUTF8StringEncoding] options:NSJSONReadingMutableContainers error:nil];
+            
+            if (array.count == 0) {
+                self.noRecordImgView.hidden = NO;
+            }
+            else
+            {
+                self.noRecordImgView.hidden = YES;
+                [_arrData addObjectsFromArray:array];//存储数据
+                [slideImageView addAdsMessageArray:array];
+            }
+        }
+        else
+        {
+            [ExampleClass yuanfang:[result objectForKey:@"message"]];
+            
+            //当没有数据时才显示请求失败提示
+            if (_arrData.count == 0) {
+                [self showInternetErrorViewWithErrorType:NetworkUploadDataFail];
+            }
+        }
+    }
+}
+
+//网络请求失败调用的代理方法
+-(void)getAPIResultFailed:(NSError *)error AndApiTag:(int)tag
+{
+    if (tag == Get_API_Tag_75)
+    {
+        //请求完成后释放_isRequesting
+        _isRequesting = NO;
+        
+        //当没有数据时才显示请求失败提示
+        if (_arrData.count == 0) {
+
+            //移除加载图
+            if ([[UploadAnimationView shareInstanceView] superview] != nil) {
+                [[UploadAnimationView shareInstanceView] removeViewFromCurrentView];
+            }
+            
+            [self showInternetErrorViewWithErrorType:NetworkOverTime];
+        }
+    }
+}
+
+//请求失败时显示的视图(NetworkErrorType表示失败类型)
+-(void)showInternetErrorViewWithErrorType:(NetworkErrorType)type
+{
+    CGRect rect = CGRectMake(0, (APPScreenBoundsHeight - 150)/2.0, APPScreenBoundsWidth, 150);
+    UploadErrorView *errorView = [[UploadErrorView alloc]initWithFrame:rect AndTarget:self AndViewTag:10000 AndErrorType:type];
+    [self.view addSubview:errorView];
+}
+
+-(void)gestureActionWithViewTag:(NSInteger)tag
+{
+    if (tag == 10000) {
+        //获取网络数据
+        [self getDataWithCurPage:@"1"];
+    }
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+#pragma mark- 返回按钮响应事件
+- (IBAction)BackAction:(UIButton *)sender {
+    
+    [self.navigationController popToRootViewControllerAnimated:YES];
+}
+
+@end

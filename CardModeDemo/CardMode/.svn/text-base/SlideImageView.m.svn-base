@@ -1,0 +1,367 @@
+//
+//  SlideImageView.m
+//  SlideImageView
+//
+//  Created by rd on 12-12-17.
+//  Copyright (c) 2012年 LXJ_成都. All rights reserved.
+//
+
+#import "SlideImageView.h"
+#import "adsView.h"
+
+@implementation SlideImageView
+@synthesize _zMarginValue, _xMarginValue, _angleValue, _alphaValue;
+@synthesize delegate;
+
+- (id)initWithFrame:(CGRect)frame ZMarginValue:(float)zMarginValue 
+       XMarginValue:(float)xMarginValue AngleValue:(float)angleValue Alpha:(float)alphaValue
+{
+    self = [super initWithFrame:frame];
+    if (self) {
+        //初始化两个存储view的数组
+        _adsViewArray = [[NSMutableArray alloc]init ];
+        _scrolladsViewArray = [[NSMutableArray alloc]init ];
+        
+        //初始化存储ads的array
+        _imageArray = [[NSMutableArray alloc]init ];
+        
+        //设置view frame
+        frame.origin = CGPointMake(0, 0);
+        
+        //添加效果视图，主要用于显示底层的叠加view效果
+        _moveView = [[UIView alloc]initWithFrame:frame];
+        _moveView.backgroundColor = [UIColor clearColor];
+        _moveView.layer.cornerRadius = 5.0;
+        
+        //添加滑动视图，通过scrollview实现
+        _scrollView = [[UIScrollView alloc]initWithFrame:frame];
+        _scrollView.backgroundColor = [UIColor clearColor];
+        _scrollView.layer.cornerRadius = 10.0;
+        
+        //添加到主视图
+        [self addSubview:_moveView];
+        [self addSubview:_scrollView];
+        
+        //z值方向的差值
+        _zMarginValue = zMarginValue;
+        //x值方向的差值
+        _xMarginValue = xMarginValue;
+        //偏移角度值
+        _angleValue = angleValue;
+        //视图透明比例值
+        _alphaValue = alphaValue;
+        
+        _shadowAlpha = 0;
+        _shadowValueX = 0;
+        _shadowValueY = 0;
+        
+        delegate = nil;
+        
+        //设置叠加视图透视投影
+        CATransform3D sublayerTransform = CATransform3DIdentity; //单位矩阵
+        sublayerTransform.m34 = -0.002;
+        [_moveView.layer setSublayerTransform:sublayerTransform];
+    }
+    return self;
+}
+
+- (void)setImageShadowsWtihDirectionX:(float)value_X Y:(float)value_Y Alpha:(float)alphaValue//设置图片阴影的x,y方向的值和透明度
+{
+    _shadowAlpha = alphaValue;
+    _shadowValueX = value_X;
+    _shadowValueY = value_Y;
+}
+
+- (void)addAdsMessageArray:(NSArray *)adsArray //添加图片数据
+{
+    if (_imageArray.count == 0) {
+        //初始化序号
+        _index = adsArray.count-1;
+    }
+    
+    [_imageArray addObjectsFromArray:adsArray];
+    
+    [self reLoadUIviewWith:adsArray.count];
+}
+
+- (void)reLoadUIviewWith:(NSInteger)count //重新加载UI
+{
+    if(_imageArray.count > 0) //有数据
+    {
+        //加载滚动视图数据
+        [self loadAdsScrollViewWith:count];
+        
+        //加载弹压视图数据
+        [self loadAdsView];
+    }
+}
+
+#pragma mark private function
+- (void)loadAdsScrollViewWith:(NSInteger)count //加载滚动视图数据
+{
+    CGSize viewSize = self.frame.size;
+    float width = viewSize.width; //图宽
+  
+    if (_imageArray.count>10) {
+        _scrollView.contentSize = CGSizeMake(width, viewSize.height*_imageArray.count);
+        
+        //经过这个操作
+        [_scrollView setContentOffset:CGPointMake(0, (count+_index)* viewSize.height) animated:NO];
+        
+        
+        adsView*ads = [_scrolladsViewArray firstObject];
+        ads.frame = CGRectMake(0, _index* viewSize.height, viewSize.width, viewSize.height-58);
+        
+        return;
+    }
+    
+    //坐标
+    CGPoint point = CGPointMake(0, (_imageArray.count-1)*viewSize.height);
+    
+    //实例化adsView
+    adsView *ads = [[adsView alloc]initWithFrame:CGRectMake(point.x, point.y, viewSize.width, viewSize.height-58)];
+    ads.backgroundColor = [UIColor whiteColor];
+    ads.layer.masksToBounds = YES;
+    ads.layer.cornerRadius = 5.0;//设置圆角
+    [ads set_upWithAdsInfo:_imageArray[0]];
+    UIButton *button = (UIButton*)[ads viewWithTag:1];
+    [button addTarget:self action:@selector(showAdsDetailAction) forControlEvents:UIControlEventTouchUpInside];
+
+    //添加点击事件用于获取点击的是哪一个消息页面
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(showAdsDetailAction)];
+    [ads addGestureRecognizer:tap];
+    
+    //设置的阴影
+    [self setShadowWithView:ads];
+    
+    
+    //添加到视图与数组中
+    [_scrolladsViewArray insertObject:ads atIndex:0];
+    [_scrollView addSubview:ads];
+    
+    //设置滚动视图属性
+    _scrollView.contentSize = _imageArray.count>1 ? CGSizeMake(width, viewSize.height*_imageArray.count):CGSizeMake(width, viewSize.height*_imageArray.count+1);
+    _scrollView.contentOffset = CGPointMake(0, (_imageArray.count-1)* viewSize.height);
+    _scrollView.pagingEnabled = YES;
+    _scrollView.autoresizingMask = YES;
+    _scrollView.clipsToBounds = NO;
+    _scrollView.showsVerticalScrollIndicator = NO;
+    _scrollView.showsHorizontalScrollIndicator = NO;
+    _scrollView.delegate = self;
+    _scrollView.backgroundColor = [UIColor clearColor];
+}
+
+//通过协议，告诉控制器应该请求哪个ads的详情信息
+-(void)showAdsDetailAction
+{
+    //获取当前视图
+    NSMutableDictionary *dic = _imageArray[_imageArray.count-1-_index];
+
+    if ([[dic objectForKey:@"isRead"] integerValue] == 0) {
+        [dic setObject:@"1" forKey:@"isRead"];
+        
+        [_imageArray replaceObjectAtIndex:(_imageArray.count-1-_index) withObject:dic];
+        
+        [(adsView*)[_scrolladsViewArray firstObject] reloadDataWithMessage:dic];
+    }
+    
+    if([delegate respondsToSelector:@selector(SlideImageViewDidClickWithIndex:)])
+    {
+        [delegate SlideImageViewDidClickWithIndex:[[dic objectForKey:@"id"] integerValue]];
+    }
+}
+
+- (void)loadAdsView //加载弹压视图数据
+{
+    if (_imageArray.count>10) {
+        return;
+    }
+    
+    float width = self.frame.size.width;
+    float height = self.frame.size.height;
+    
+    for(int i=0; i<(_imageArray.count<4?_imageArray.count:4); i++)
+    {
+        //设置adsView的坐标，z值和透明度
+        CGPoint point = CGPointMake(0, -i*height/_xMarginValue);
+        float zPosition = -i*height/_zMarginValue;
+        
+        //实例化adsView
+        adsView *ads = [[adsView alloc]initWithFrame:CGRectMake(point.x, point.y, width,height-58)];
+        ads.backgroundColor = [UIColor whiteColor];
+        ads.layer.masksToBounds = YES;
+        ads.layer.cornerRadius = 5.0;
+        [ads set_upWithAdsInfo:_imageArray[i]];
+        
+        if (i<3) {
+            ads.layer.zPosition = zPosition; // Z坐标
+            ads.alpha = 1;
+        }
+        else{
+            ads.layer.zPosition = -288; // Z坐标
+            ads.alpha = 0;
+        }
+        
+        //设置图片的阴影
+        [self setShadowWithView:ads];
+        
+        //添加到视图与数组中
+        if(i == 0){
+            ads.hidden = YES;
+        }
+        
+        [_adsViewArray insertObject:ads atIndex:0];
+        [_moveView addSubview:ads];
+    }
+}
+
+- (UIImage *)ImageWithSize:(UIImage *)image toSize:(CGSize)reSize //按尺寸缩放图片
+{
+    UIGraphicsBeginImageContext(reSize);
+    [image drawInRect:CGRectMake(0, 0, reSize.width, reSize.height)];
+    UIImage *reSizeImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return reSizeImage;
+}
+
+#pragma mark UIScrollView delegate
+- (void) scrollViewDidScroll:(UIScrollView *)scrollView //滚动时处理
+{
+    float offset_y = scrollView.contentOffset.y;//scrollView所在位置
+    float height = scrollView.frame.size.height;//高度
+    float width = scrollView.frame.size.width;//视图宽度
+    float currentIndex = offset_y/height;//当前标签
+    
+    //得到索引
+    _index = currentIndex>(int)currentIndex?(int)currentIndex+1:(int)currentIndex;
+    
+    if (_index>_imageArray.count-1) {
+        _index = (int)_imageArray.count-1;
+    }
+    
+    //调整滚动视图图片的角度
+    adsView* scrollAdsView = [_scrolladsViewArray firstObject];
+    
+    //表示处于当前视图内
+    if(scrollAdsView.frame.origin.y<offset_y)
+    {        
+        if(offset_y>_imageArray.count*height-height){
+            scrollAdsView.hidden = YES;
+        }else{
+            scrollAdsView.hidden = NO;
+            scrollAdsView.frame = CGRectMake(0, _index*height, scrollAdsView.frame.size.width, scrollAdsView.frame.size.height);
+            [scrollAdsView reloadDataWithMessage:_imageArray[_imageArray.count-1-_index]];
+        }
+    }
+    else if(scrollAdsView.frame.origin.y-height<offset_y&&offset_y<=scrollAdsView.frame.origin.y)
+    {
+        scrollAdsView.hidden = NO;
+    }
+    else
+    {
+        scrollAdsView.frame = CGRectMake(0, _index*height, scrollAdsView.frame.size.width, scrollAdsView.frame.size.height);
+        [scrollAdsView reloadDataWithMessage:_imageArray[_imageArray.count-1-_index]];
+    }
+    
+    int _select = _index-3>0?(_index-3):0;
+    
+    for (int i=_select; i<=_index; i++) {
+        //调整滚动视图图片的角度
+        float currOrigin_y = i * height; //当前图片的y坐标
+        
+        //调整叠加视图
+        adsView* moveAdsView = [_adsViewArray objectAtIndex:i-_select];
+        [moveAdsView reloadDataWithMessage:_imageArray[_imageArray.count-1-i]];
+        
+        float range_y = (currOrigin_y - offset_y)/(_xMarginValue) ;
+        
+        moveAdsView.frame = CGRectMake(0, range_y, width, height-58);
+        
+        if(range_y >= 0) // 如果超过当前滑动视图便隐藏
+            moveAdsView.hidden = YES;
+        else
+        {
+            moveAdsView.hidden = NO;
+        }
+        
+        //调整弹压视图的z值
+        float range_z = -(offset_y-currOrigin_y)/_zMarginValue;
+        
+        moveAdsView.layer.zPosition = range_z;
+        
+        //调整弹压视图的透明度
+        float alpha = 1.f + (currOrigin_y-offset_y)/_alphaValue;
+        
+        if (currentIndex-2<=i && i<=currentIndex) {
+            moveAdsView.alpha = 1;
+        }else if(currentIndex-2>i&&currentIndex-3<i){
+            moveAdsView.alpha = alpha;
+        }
+        else{
+            moveAdsView.alpha = 0;
+        }
+    }
+    
+    //代理滚动时回调函数
+    if([delegate respondsToSelector:@selector(SlideImageViewDidScrollWithPage:AndIndex:)])
+        [delegate SlideImageViewDidScrollWithPage:_imageArray.count-1 AndIndex:_index];
+}
+
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate
+{
+    for(adsView* ads in _scrolladsViewArray)  //调整所有图片的z值
+        ads.layer.zPosition = 0;
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView //滚动结束处理
+{
+    if([delegate respondsToSelector:@selector(SlideImageViewDidEndScorllWithIndex:)])
+    {
+        [delegate SlideImageViewDidEndScorllWithIndex:_index];
+    }
+}
+
+-(void)setShadowWithView:(UIView*)view{
+    
+    view.layer.shadowColor = [UIColor yellowColor].CGColor;//shadowColor阴影颜色
+    view.layer.shadowOffset = CGSizeMake(0,0);//shadowOffset阴影偏移，默认(0, -3),这个跟shadowRadius配合使用
+    view.layer.shadowOpacity = 1;//阴影透明度，默认0
+    view.layer.shadowRadius = 3;//阴影半径，默认3
+    
+    //路径阴影
+    UIBezierPath *path = [UIBezierPath bezierPath];
+    
+    float width = view.bounds.size.width;
+    float height = view.bounds.size.height;
+    float x = view.bounds.origin.x;
+    float y = view.bounds.origin.y;
+    float addWH = 10;
+    
+    CGPoint topLeft      = view.bounds.origin;
+    CGPoint topMiddle = CGPointMake(x+(width/2),y-addWH);
+    CGPoint topRight     = CGPointMake(x+width,y);
+    
+    CGPoint rightMiddle = CGPointMake(x+width+addWH,y+(height/2));
+    
+    CGPoint bottomRight  = CGPointMake(x+width,y+height);
+    CGPoint bottomMiddle = CGPointMake(x+(width/2),y+height+addWH);
+    CGPoint bottomLeft   = CGPointMake(x,y+height);
+    
+    
+    CGPoint leftMiddle = CGPointMake(x-addWH,y+(height/2));
+    
+    [path moveToPoint:topLeft];
+    //添加四个二元曲线
+    [path addQuadCurveToPoint:topRight
+                 controlPoint:topMiddle];
+    [path addQuadCurveToPoint:bottomRight
+                 controlPoint:rightMiddle];
+    [path addQuadCurveToPoint:bottomLeft
+                 controlPoint:bottomMiddle];
+    [path addQuadCurveToPoint:topLeft
+                 controlPoint:leftMiddle];
+    //设置阴影路径
+    view.layer.shadowPath = path.CGPath;
+}
+
+@end

@@ -1,0 +1,167 @@
+//
+//  adsView.m
+//  demo
+//
+//  Created by apple on 16/6/6.
+//
+//
+
+#import "adsView.h"
+#import "ExampleClass.h"
+
+#define bottomDistance 20.0 //视图底部的距离，通过view.center设置
+#define imageViewWidth 281.0*(self.frame.size.width/293.0) //显示图片的宽度
+#define imageViewHeight 175.0*(self.frame.size.width/293.0) //显示图片的高度
+#define describeViewMaximumHeight 100*(self.frame.size.width/293.0) //描述语视图的最大高度
+#define viewCornerRedius 5.0 //圆角
+#define labelWidth 271*(self.frame.size.width/293.0) //label的宽度
+#define viewRect self.frame //view的frame
+
+@interface adsView ()
+{
+    UIImageView *_imageView;
+    UILabel *_titleLab;
+    UILabel *_describeLab;
+    UILabel *_timeLab;
+    UILabel *_timeNoticeLab;
+    UIButton *_button;
+}
+@end
+
+@implementation adsView
+
+
+// Only override drawRect: if you perform custom drawing.
+// An empty implementation adversely affects performance during animation.
+- (void)drawRect:(CGRect)rect {
+    // Drawing code
+}
+
+-(void)set_upWithAdsInfo:(NSDictionary*)dictionary
+{
+    //tag和id创建联系
+    self.tag = [[dictionary objectForKey:@"id"] integerValue] + 100;
+    
+    //添加图片
+    _imageView = [[UIImageView alloc]initWithFrame:CGRectMake((viewRect.size.width-imageViewWidth)/2.0, 6, imageViewWidth, imageViewHeight)];
+    _imageView.layer.masksToBounds = YES;
+    _imageView.layer.cornerRadius = viewCornerRedius;
+    _imageView.contentMode = UIViewContentModeScaleAspectFill;
+    //添加图片
+    
+    [_imageView sd_setImageWithURL:[NSURL URLWithString:[dictionary objectForKey:@"imgUrl"]] placeholderImage:[UIImage imageNamed:@"bannerLoading.png"]];
+    
+    [self addSubview:_imageView];
+    
+    //添加标题
+    _titleLab = [[UILabel alloc]initWithFrame:CGRectMake((viewRect.size.width-labelWidth)/2.0, _imageView.frame.origin.y+_imageView.frame.size.height+13, labelWidth, 15)];
+    _titleLab.font = KHSYSFont(15.0);
+    _titleLab.textAlignment = NSTextAlignmentLeft;
+    _titleLab.textColor = RGBCOLOR(0x57, 0x57, 0x57);
+    //添加标题
+    _titleLab.text = [dictionary objectForKey:@"title"];
+    [self addSubview:_titleLab];
+    
+    //添加描述语
+    _describeLab = [[UILabel alloc]initWithFrame:CGRectMake((viewRect.size.width-labelWidth)/2.0, _titleLab.frame.origin.y+_titleLab.frame.size.height+10, labelWidth, describeViewMaximumHeight)];
+    
+    _describeLab.font = KHSYSFont(13.0);
+    _describeLab.textAlignment = NSTextAlignmentLeft;
+    _describeLab.numberOfLines = 0;//支持多行
+    _describeLab.lineBreakMode =NSLineBreakByTruncatingTail;//其中lineBreakMode可选值为，以省略号结尾
+    _describeLab.textColor = RGBCOLOR(0xa5, 0xa5, 0xa5);
+    //添加描述语内容
+    _describeLab.text = [dictionary objectForKey:@"guideLanguage"];//引导语
+    //设置行距
+    NSMutableAttributedString * attributedString = [[NSMutableAttributedString alloc] initWithString:_describeLab.text];
+    NSMutableParagraphStyle * paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+    [paragraphStyle setLineSpacing:5];
+    [attributedString addAttribute:NSParagraphStyleAttributeName value:paragraphStyle range:NSMakeRange(0, [_describeLab.text length])];
+    [_describeLab setAttributedText:attributedString];
+    //ios7以上才支持这个方法
+    if (isIOS7) {
+        CGSize _size = [_describeLab.text boundingRectWithSize:_describeLab.bounds.size options:NSStringDrawingUsesLineFragmentOrigin attributes:@{NSFontAttributeName:KHSYSFont(13.0),NSParagraphStyleAttributeName:paragraphStyle} context:nil].size;
+        _describeLab.frame = CGRectMake(_describeLab.frame.origin.x, _describeLab.frame.origin.y, _size.width, _size.height);
+    }
+    [self addSubview:_describeLab];
+    
+    //添加消息时间
+    _timeLab = [[UILabel alloc]initWithFrame:CGRectMake(_describeLab.frame.origin.x, 0, 60, 12)];
+    _timeLab.center = CGPointMake(_timeLab.center.x, self.frame.size.height-bottomDistance);
+    _timeLab.font = KKGPLFont(12.0);
+    _timeLab.textAlignment = NSTextAlignmentLeft;
+    _timeLab.textColor = RGBCOLOR(0xa5, 0xa5, 0xa5);
+    _timeLab.text = [ExampleClass DataFormatToDataTwo:[dictionary objectForKey:@"sendTime"]];
+    [self addSubview:_timeLab];
+    
+    //添加新消息标记(是否为新消息)
+    
+    _timeNoticeLab = [[UILabel alloc]initWithFrame:CGRectMake(_timeLab.frame.origin.x+_timeLab.frame.size.width, 0, 30, 13)];
+    _timeNoticeLab.center = CGPointMake(_timeNoticeLab.center.x, self.frame.size.height-bottomDistance);
+    _timeNoticeLab.backgroundColor = RGBCOLOR(0xfc, 0x6e, 0x51);
+    _timeNoticeLab.font = KKGPLFont(12.0);
+    _timeNoticeLab.textAlignment = NSTextAlignmentCenter;
+    _timeNoticeLab.textColor = RGBCOLOR(0xff, 0xff, 0xff);
+    _timeNoticeLab.text = @"new";
+    [self addSubview:_timeNoticeLab];
+    
+    if ([[dictionary objectForKey:@"isRead"] integerValue]==0) {
+        _timeNoticeLab.hidden = NO;
+    }else
+        _timeNoticeLab.hidden = YES;
+    
+    //添加查看消息详情事件
+    _button = [UIButton buttonWithType:UIButtonTypeCustom];
+    _button.tag = 1;//用于定位
+    [_button setTitle:@"详情>>" forState:UIControlStateNormal];
+    [_button setTitle:@"详情>>" forState:UIControlStateHighlighted];
+    _button.titleLabel.font = KHSYSFont(12);
+    [_button setTitleColor:RGBCOLOR(0x4c, 0x6d, 0xb4) forState:UIControlStateNormal];
+    [_button setTitleColor:RGBCOLOR(0x66, 0x66, 0x66) forState:UIControlStateHighlighted];
+    _button.frame = CGRectMake(viewRect.size.width-_describeLab.frame.origin.x-50, 0, 50, 12);
+    _button.center = CGPointMake(_button.center.x, self.frame.size.height-bottomDistance);
+    [self addSubview:_button];
+}
+
+-(void)reloadDataWithMessage:(NSDictionary *)dictionary
+{
+    //防止重复赋值操作
+    if(self.tag == [[dictionary objectForKey:@"id"] integerValue] + 100){
+        if ([[dictionary objectForKey:@"isRead"] integerValue]==0) {
+            _timeNoticeLab.hidden = NO;
+        }else
+            _timeNoticeLab.hidden = YES;
+        
+        return;
+    }
+    
+    //tag和id创建联系
+    self.tag = [[dictionary objectForKey:@"id"] integerValue] + 100;
+    
+     [_imageView sd_setImageWithURL:[NSURL URLWithString:[dictionary objectForKey:@"imgUrl"]] placeholderImage:[UIImage imageNamed:@"bannerLoading.png"]];
+    
+    _titleLab.text = [dictionary objectForKey:@"title"];
+        
+    _describeLab.text = [dictionary objectForKey:@"guideLanguage"];
+    
+    //设置行距
+    NSMutableAttributedString * attributedString = [[NSMutableAttributedString alloc] initWithString:_describeLab.text];
+    NSMutableParagraphStyle * paragraphStyle = [[NSMutableParagraphStyle alloc] init];
+    [paragraphStyle setLineSpacing:5];
+    [attributedString addAttribute:NSParagraphStyleAttributeName value:paragraphStyle range:NSMakeRange(0, [_describeLab.text length])];
+    [_describeLab setAttributedText:attributedString];
+    //ios7以上才支持这个方法
+    if (isIOS7) {
+        CGSize _size = [_describeLab.text boundingRectWithSize:CGSizeMake(labelWidth, describeViewMaximumHeight) options:NSStringDrawingUsesLineFragmentOrigin attributes:@{NSFontAttributeName:KHSYSFont(13.0),NSParagraphStyleAttributeName:paragraphStyle} context:nil].size;
+        _describeLab.frame = CGRectMake(_describeLab.frame.origin.x, _describeLab.frame.origin.y, _size.width, _size.height);
+    }
+    
+    _timeLab.text = [ExampleClass DataFormatToDataTwo:[dictionary objectForKey:@"sendTime"]];
+    
+    if ([[dictionary objectForKey:@"isRead"] integerValue]==0) {
+        _timeNoticeLab.hidden = NO;
+    }else
+        _timeNoticeLab.hidden = YES;
+}
+
+@end

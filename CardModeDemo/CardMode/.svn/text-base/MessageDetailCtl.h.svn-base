@@ -1,0 +1,31 @@
+//
+//  MessageDetailCtl.h
+//  Huilc
+//
+//  Created by apple on 15/5/25.
+//  Copyright (c) 2015年 RongXin. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+
+@interface MessageDetailCtl : UIViewController
+
+//背景图展示
+@property (strong, nonatomic) IBOutlet UIImageView *backgroundImageView;
+
+//消息标题
+@property (strong, nonatomic) IBOutlet UILabel *messageTitleLab;
+//消息时间
+@property (strong, nonatomic) IBOutlet UILabel *messageTimeLab;
+//消息内容
+@property (strong, nonatomic) IBOutlet UIWebView *messageContentWeb;
+//webView控件
+@property (strong, nonatomic) IBOutlet UIWebView *myWebView;
+
+//接收消息内容
+@property (strong,nonatomic) NSString *noticeId;
+//消息详情链接
+@property (strong,nonatomic) NSString *urlString;
+@property (strong, nonatomic) IBOutlet UIView *backView;//底部视图
+
+@end
