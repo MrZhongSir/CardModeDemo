@@ -18,6 +18,7 @@
 		183174521DE3E34500C7FEC5 /* CustomSlideView.m in Sources */ = {isa = PBXBuildFile; fileRef = 183174511DE3E34500C7FEC5 /* CustomSlideView.m */; };
 		183174551DE40FE900C7FEC5 /* CardView.m in Sources */ = {isa = PBXBuildFile; fileRef = 183174541DE40FE900C7FEC5 /* CardView.m */; };
 		183174571DE416DB00C7FEC5 /* CardViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 183174561DE416DB00C7FEC5 /* CardViewController.m */; };
+		183174591DE5387400C7FEC5 /* CardView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 183174581DE5387400C7FEC5 /* CardView.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +60,7 @@
 		183174531DE40FE900C7FEC5 /* CardView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CardView.h; sourceTree = "<group>"; };
 		183174541DE40FE900C7FEC5 /* CardView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CardView.m; sourceTree = "<group>"; };
 		183174561DE416DB00C7FEC5 /* CardViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CardViewController.m; sourceTree = "<group>"; };
+		183174581DE5387400C7FEC5 /* CardView.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = CardView.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,6 +159,7 @@
 				183174511DE3E34500C7FEC5 /* CustomSlideView.m */,
 				183174531DE40FE900C7FEC5 /* CardView.h */,
 				183174541DE40FE900C7FEC5 /* CardView.m */,
+				183174581DE5387400C7FEC5 /* CardView.xib */,
 			);
 			name = Card;
 			sourceTree = "<group>";
@@ -270,6 +273,7 @@
 			files = (
 				1831740B1DE3D81400C7FEC5 /* LaunchScreen.storyboard in Resources */,
 				183174081DE3D81400C7FEC5 /* Assets.xcassets in Resources */,
+				183174591DE5387400C7FEC5 /* CardView.xib in Resources */,
 				1831744F1DE3DE1C00C7FEC5 /* CardViewController.xib in Resources */,
 				183174061DE3D81400C7FEC5 /* Main.storyboard in Resources */,
 			);

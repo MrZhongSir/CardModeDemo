@@ -106,7 +106,8 @@
     CGPoint point = CGPointMake(0, (_cardDataArray.count-1)*viewSize.height);
     
     //实例化CardView
-    CardView *card = [[CardView alloc]initWithFrame:CGRectMake(point.x, point.y, viewSize.width, viewSize.height-58)];
+    CardView *card = [[NSBundle mainBundle] loadNibNamed:@"CardView" owner:self options:nil].firstObject;
+    card.frame=CGRectMake(point.x, point.y, viewSize.width, viewSize.height-58);
     card.backgroundColor = [UIColor whiteColor];
     card.layer.masksToBounds = YES;
     card.layer.cornerRadius = 5.0;//设置圆角
@@ -141,7 +142,8 @@
         float zPosition = -i*height/_zMarginValue;
         
         //实例化CardView
-        CardView *card = [[CardView alloc]initWithFrame:CGRectMake(point.x, point.y, width,height-58)];
+        CardView *card = [[NSBundle mainBundle] loadNibNamed:@"CardView" owner:self options:nil].firstObject;
+        card.frame=CGRectMake(point.x, point.y, width,height-58);
         card.backgroundColor = [UIColor whiteColor];
         card.layer.masksToBounds = YES;
         card.layer.cornerRadius = 5.0;
